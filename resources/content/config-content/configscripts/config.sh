@@ -117,7 +117,7 @@ download()
 
     info Downloading $DOWNLOAD_URL "current=$current"
 
-    get $get_opts "$DOWNLOAD_URL?current=$current" > $DOWNLOAD_TEMP/download
+    get $get_opts "$DOWNLOAD_URL?current=$current&withVersion=true" > $DOWNLOAD_TEMP/download
     HEADER=$(cat $DOWNLOAD_TEMP/download | head -n1)
     if [[ "$HEADER" =~ version:* ]]; then
         archive_version=$(echo $HEADER | cut -f2 -d:)

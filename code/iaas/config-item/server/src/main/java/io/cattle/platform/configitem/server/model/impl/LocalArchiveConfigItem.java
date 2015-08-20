@@ -46,7 +46,9 @@ public class LocalArchiveConfigItem extends AbstractConfigItem {
     public void handleRequest(Request req) throws IOException {
         req.setContentType("application/octet-stream");
         OutputStream os = req.getOutputStream();
-        os.write(String.format("version:%s\n", getVersion(req)).getBytes("UTF-8"));
+        if(req.getParams().containsKey("withVersion")) {
+            os.write(String.format("version:%s\n", getVersion(req)).getBytes("UTF-8"));
+        }
         copyFile(os);
     }
 
