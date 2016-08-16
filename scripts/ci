@@ -72,7 +72,7 @@ DEV_HOST=localhost:8081 ../tools/development/register-boot2docker.sh >/tmp/regis
 
 
 threads=$(($(nproc) + 1))
-if [ $threads -gt 5 ]; then
+if [ $threads -gt 8 ]; then
     threads=5
 fi
 ./test -- -m "'not nonparallel'" -n $threads -v || {
@@ -94,7 +94,7 @@ export CATTLE_TEST_HTTP_PROXIED_PORT=8084
 export CATTLE_TEST_URL=http://localhost:8083/v1/schemas
 
 run ./run --background
-./test -e py27 -- core/test_virtual_machine.py core/test_container.py || {
+./test -e py27 -- -n $threads -v core/test_virtual_machine.py core/test_container.py || {
     echo Test failed
     cat /tmp/run.log
     echo Test failed
