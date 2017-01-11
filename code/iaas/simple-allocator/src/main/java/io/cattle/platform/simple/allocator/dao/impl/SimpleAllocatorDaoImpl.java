@@ -12,10 +12,16 @@ import static io.cattle.platform.core.model.tables.StoragePoolTable.*;
 import io.cattle.platform.allocator.service.AllocationCandidate;
 import io.cattle.platform.core.constants.CommonStatesConstants;
 import io.cattle.platform.core.constants.InstanceConstants;
+import io.cattle.platform.core.model.Instance;
 import io.cattle.platform.core.model.Port;
 import io.cattle.platform.core.model.tables.records.PortRecord;
+import io.cattle.platform.core.util.PortSpec;
 import io.cattle.platform.db.jooq.dao.impl.AbstractJooqDao;
 import io.cattle.platform.object.ObjectManager;
+import io.cattle.platform.object.util.DataAccessor;
+import io.cattle.platform.simple.allocator.ComputeResourceRequest;
+import io.cattle.platform.simple.allocator.PortBindingResourceRequest;
+import io.cattle.platform.simple.allocator.ResourceRequest;
 import io.cattle.platform.simple.allocator.dao.QueryOptions;
 import io.cattle.platform.simple.allocator.dao.SimpleAllocatorDao;
 
@@ -46,6 +52,13 @@ public class SimpleAllocatorDaoImpl extends AbstractJooqDao implements SimpleAll
        hostAndPortFields = new ArrayList<Field<?>>(Arrays.asList(PORT.fields()));
        hostAndPortFields.add(INSTANCE_HOST_MAP.HOST_ID);
     }
+    
+    private static final String INSTANCE_RESERVATION = "instanceReservation";
+    private static final String MEMORY_RESERVATION = "memoryReservation";
+    private static final String CPU_RESERVATION = "cpuReservation";
+    private static final String PORT_RESERVATION = "portReservation";
+    
+    private static final String BIND_ADDRESS = "bindAddress";
 
     ObjectManager objectManager;
 
@@ -198,6 +211,49 @@ public class SimpleAllocatorDaoImpl extends AbstractJooqDao implements SimpleAll
     @Inject
     public void setObjectManager(ObjectManager objectManager) {
         this.objectManager = objectManager;
+    }
+    
+    
+    @Override
+    public ResourceRequest populateResourceRequestFromInstance(Instance instance, String resourceType, String poolType) {
+        switch (resourceType) {
+        case PORT_RESERVATION:
+            PortBindingResourceRequest request = new PortBindingResourceRequest();
+            request.setResource(resourceType);
+            request.setInstanceId(instance.getId().toString());
+            List<PortSpec> portReservation = new ArrayList<>();
+            for(Port port: objectManager.children(instance, Port.class)) {
+                PortSpec spec = new PortSpec();
+                String bindAddress = DataAccessor.fieldString(port, BIND_ADDRESS);
+                if (bindAddress != null) {
+                    spec.setIpAddress(bindAddress);
+                }
+                spec.setPrivatePort(port.getPrivatePort());
+                spec.setPublicPort(port.getPublicPort());
+                portReservation.add(spec);
+            }
+            if (portReservation.isEmpty()) {
+                return null;
+            }
+            request.setPortRequests(portReservation);
+            request.setType(poolType);
+            return request;
+        case INSTANCE_RESERVATION:
+            return new ComputeResourceRequest(INSTANCE_RESERVATION, 1l, poolType);
+        case MEMORY_RESERVATION:
+            if (instance.getMemoryReservation() != null && instance.getMemoryReservation() > 0) {
+                ResourceRequest rr = new ComputeResourceRequest(MEMORY_RESERVATION, instance.getMemoryReservation(), poolType);
+                return rr;
+            } 
+            return null;
+        case CPU_RESERVATION:
+            if (instance.getMilliCpuReservation() != null && instance.getMilliCpuReservation() > 0) {
+                ResourceRequest rr = new ComputeResourceRequest(CPU_RESERVATION, instance.getMilliCpuReservation(), poolType);
+                return rr;
+            }
+            return null;
+        }
+        return null;
     }
 
 }

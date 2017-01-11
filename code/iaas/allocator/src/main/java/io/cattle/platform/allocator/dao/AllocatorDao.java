@@ -54,4 +54,6 @@ public interface AllocatorDao {
     boolean isAllocationReleased(Object resource);
 
     String getAllocatedHostUuid(Volume volume);
+    
+    void updateInstancePorts(Map<String, Object> allocatedIPs);
  }

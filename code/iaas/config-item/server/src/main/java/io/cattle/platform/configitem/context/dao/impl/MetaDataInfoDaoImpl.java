@@ -103,7 +103,7 @@ public class MetaDataInfoDaoImpl extends AbstractJooqDao implements MetaDataInfo
                 PortSpec spec = new PortSpec();
                 String ipAddress = DataAccessor.fieldString(port, "bindAddress");
                 if (ipAddress == null || ipAddress.equals("0.0.0.0")) {
-                    spec.setIpAddress(hostMetaData.getAgent_ip());
+                    spec.setIpAddress("0.0.0.0");
                 } else {
                     spec.setIpAddress(ipAddress);
                 }

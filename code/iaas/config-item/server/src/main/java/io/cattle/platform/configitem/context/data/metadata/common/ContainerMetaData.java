@@ -19,10 +19,9 @@ import java.util.Map;
 
 import javax.inject.Inject;
 
-import com.google.common.base.Splitter;
-
 import org.apache.commons.collections.IteratorUtils;
 
+import com.google.common.base.Splitter;
 
 public class ContainerMetaData {
     

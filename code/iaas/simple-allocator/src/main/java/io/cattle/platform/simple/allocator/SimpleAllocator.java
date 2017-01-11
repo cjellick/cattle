@@ -53,6 +53,10 @@ public class SimpleAllocator extends AbstractAllocator implements Allocator, Nam
     private static final String MEMORY_RESERVATION = "memoryReservation";
     private static final String CPU_RESERVATION = "cpuReservation";
     private static final String STORAGE_SIZE = "storageSize";
+    private static final String PORT_RESERVATION = "portReservation";
+    
+    private static final String COMPUTE_POOL = "computePool";
+    private static final String PORT_POOL = "portPool";
 
     String name = getClass().getSimpleName();
 
@@ -64,7 +68,7 @@ public class SimpleAllocator extends AbstractAllocator implements Allocator, Nam
 
     @Inject
     AgentLocator agentLocator;
-
+ 
     @Inject
     GenericMapDao mapDao;
 
@@ -130,6 +134,7 @@ public class SimpleAllocator extends AbstractAllocator implements Allocator, Nam
         return allocatorDao.recordCandidate(attempt, candidate);
     }
 
+    @SuppressWarnings("unchecked")
     void callExternalSchedulerToReserve(AllocationAttempt attempt, AllocationCandidate candidate) {
         Long agentId = getAgentResource(attempt.getAccountId(), attempt.getInstances());
         if (agentId != null) {
@@ -143,7 +148,15 @@ public class SimpleAllocator extends AbstractAllocator implements Allocator, Nam
                 }
 
                 RemoteAgent agent = agentLocator.lookupAgent(agentId);
-                callScheduler("Error reserving resources: %s", schedulerEvent, agent);
+                Event eventResult = callScheduler("Error reserving resources: %s", schedulerEvent, agent);
+                if (eventResult.getData() == null) {
+                    return;
+                }
+                // logic for updating the port
+                Map<String, Object> data = (Map<String, Object>) CollectionUtils.getNestedValue(eventResult.getData(), PORT_RESERVATION);
+                if (data != null) {
+                    allocatorDao.updateInstancePorts(data);
+                } 
             }
         }
     }
@@ -261,33 +274,30 @@ public class SimpleAllocator extends AbstractAllocator implements Allocator, Nam
     private void addVolumeResourceRequests(List<ResourceRequest> requests, Volume... volumes) {
         for (Volume v : volumes) {
             if (v.getSizeMb() != null) {
-                ResourceRequest rr = new ResourceRequest();
-                rr.setAmount(v.getSizeMb());
-                rr.setResource(STORAGE_SIZE);
+                ResourceRequest rr = new ComputeResourceRequest(STORAGE_SIZE, v.getSizeMb(), COMPUTE_POOL);
                 requests.add(rr);
             }
         }
     }
 
     private void addInstanceResourceRequests(List<ResourceRequest> requests, Instance instance) {
-        if (instance.getMemoryReservation() != null && instance.getMemoryReservation() > 0) {
-            ResourceRequest rr = new ResourceRequest();
-            rr.setAmount(instance.getMemoryReservation());
-            rr.setResource(MEMORY_RESERVATION);
-            requests.add(rr);
+        ResourceRequest memoryRequest = simpleAllocatorDao.populateResourceRequestFromInstance(instance, MEMORY_RESERVATION, COMPUTE_POOL);
+        if (memoryRequest != null) {
+            requests.add(memoryRequest);
         }
 
-        if (instance.getMilliCpuReservation() != null && instance.getMilliCpuReservation() > 0) {
-            ResourceRequest rr = new ResourceRequest();
-            rr.setAmount(instance.getMilliCpuReservation());
-            rr.setResource(CPU_RESERVATION);
-            requests.add(rr);
+        ResourceRequest cpuRequest = simpleAllocatorDao.populateResourceRequestFromInstance(instance, CPU_RESERVATION, COMPUTE_POOL);
+        if (cpuRequest != null) {
+            requests.add(cpuRequest);
+        }
+        
+        ResourceRequest portRequests = simpleAllocatorDao.populateResourceRequestFromInstance(instance, PORT_RESERVATION, PORT_POOL);
+        if (portRequests != null) {
+            requests.add(portRequests);
         }
 
-        ResourceRequest r = new ResourceRequest();
-        r.setAmount(1l);
-        r.setResource(INSTANCE_RESERVATION);
-        requests.add(r);
+        ResourceRequest instanceRequest = simpleAllocatorDao.populateResourceRequestFromInstance(instance, INSTANCE_RESERVATION, COMPUTE_POOL);
+        requests.add(instanceRequest);
     }
 
     private Long getAgentResource(Long accountId, List<Instance> instances) {
