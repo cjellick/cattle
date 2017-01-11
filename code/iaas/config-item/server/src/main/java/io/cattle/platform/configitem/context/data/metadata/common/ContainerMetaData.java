@@ -8,7 +8,7 @@ import io.cattle.platform.core.model.Account;
 import io.cattle.platform.core.model.Instance;
 import io.cattle.platform.core.model.Nic;
 import io.cattle.platform.core.model.ServiceExposeMap;
-import io.cattle.platform.core.util.PortSpec;
+import io.cattle.platform.object.ObjectManager;
 import io.cattle.platform.object.util.DataAccessor;
 
 import java.util.ArrayList;
@@ -17,12 +17,18 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.collections.IteratorUtils;
-import org.apache.commons.lang3.StringUtils;
+import javax.inject.Inject;
 
 import com.google.common.base.Splitter;
 
+import org.apache.commons.collections.IteratorUtils;
+
+
 public class ContainerMetaData {
+    
+    @Inject
+    ObjectManager objectManager;
+    
     private Long serviceId;
     private HostMetaData hostMetaData;
     private String dnsPrefix;
@@ -151,9 +157,9 @@ public class ContainerMetaData {
 
     @SuppressWarnings("unchecked")
     public void setInstanceAndHostMetadata(Instance instance, HostMetaData hostMetaData, List<String> healthcheckHosts,
-            Account account, boolean isHostNetworking) {
+            Account account, boolean isHostNetworking, List<String> ports) {
         this.hostMetaData = hostMetaData;
-    this.instance = instance;
+        this.instance = instance;
         this.instanceId = instance.getId();
         this.name = instance.getName();
         this.uuid = instance.getUuid();
@@ -167,20 +173,14 @@ public class ContainerMetaData {
                 .as(List.class);
         this.hostname = instance.getHostname();
         if (hostMetaData != null) {
+            // this logic will be changed to populate the correct info
             this.host_uuid = hostMetaData.getUuid();
             String hostIp = hostMetaData.agent_ip;
             List<String> newPorts = new ArrayList<>();
             if (hostIp == null) {
                 newPorts.addAll(portsObj);
             } else {
-                for (String portObj : portsObj) {
-                    PortSpec port = new PortSpec(portObj);
-                    if (StringUtils.isEmpty(port.getIpAddress())) {
-                        newPorts.add(hostIp + ":" + portObj);
-                    } else {
-                        newPorts.add(portObj);
-                    }
-                }
+                newPorts.addAll(ports);
             }
             this.ports = newPorts;
         }
